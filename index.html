@@ -297,6 +297,93 @@
             margin-top: 16px;
         }
         
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .upload-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        .upload-icon {
+            font-size: 2rem;
+        }
+        
+        .image-preview {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+        }
+        
+        .remove-image {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+        
+        .remove-image:hover {
+            background: #ef4444;
+            border-color: #ef4444;
+        }
+        
+        .or-divider {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin: 12px 0;
+            position: relative;
+        }
+        
+        .or-divider::before,
+        .or-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: var(--border);
+        }
+        
+        .or-divider::before { left: 0; }
+        .or-divider::after { right: 0; }
+        
         .timezone-note {
             font-size: 0.8rem;
             color: var(--text-muted);
@@ -353,13 +440,29 @@
             <div class="card-header">
                 <span class="card-title">Event Details</span>
             </div>
-            <textarea id="eventText" placeholder="Paste your event details here...
+            
+            <!-- Image Upload Area -->
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <div class="upload-placeholder" id="uploadPlaceholder">
+                    <span class="upload-icon">📷</span>
+                    <span>Drop image, paste screenshot, or tap to upload</span>
+                </div>
+                <div class="image-preview" id="imagePreview" style="display: none;">
+                    <img id="previewImg" src="" alt="Preview">
+                    <button class="remove-image" onclick="removeImage()">✕</button>
+                </div>
+            </div>
+            
+            <div class="or-divider">
+                <span>or paste text</span>
+            </div>
+            
+            <textarea id="eventText" placeholder="Paste event details here...
 
 Example:
 Team meeting with John and Sarah
-Friday 15th March at 2:30pm
-Ingham's Head Office, Auckland
-Discuss Q2 planning"></textarea>
+Friday 15th March at 2:30pm"></textarea>
             <button class="btn btn-block" id="extractBtn" onclick="extractEvent()" disabled>
                 Extract Event
             </button>
@@ -395,6 +498,7 @@ Discuss Q2 planning"></textarea>
 
     <script>
         let eventData = null;
+        let imageBase64 = null;
         const STORAGE_KEY = 'calendar_extractor_api_key';
         
         // Check for saved API key on load
@@ -404,7 +508,73 @@ Discuss Q2 planning"></textarea>
                 document.getElementById('apiKey').value = savedKey;
                 setConnectedState(true);
             }
+            
+            // Set up image upload handlers
+            setupImageHandlers();
         });
+        
+        function setupImageHandlers() {
+            const uploadArea = document.getElementById('uploadArea');
+            const imageInput = document.getElementById('imageInput');
+            
+            // Click to upload
+            uploadArea.addEventListener('click', () => imageInput.click());
+            
+            // File input change
+            imageInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) handleImageFile(e.target.files[0]);
+            });
+            
+            // Drag and drop
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) handleImageFile(e.dataTransfer.files[0]);
+            });
+            
+            // Paste anywhere on page
+            document.addEventListener('paste', (e) => {
+                const items = e.clipboardData?.items;
+                if (items) {
+                    for (let item of items) {
+                        if (item.type.startsWith('image/')) {
+                            handleImageFile(item.getAsFile());
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+        
+        function handleImageFile(file) {
+            if (!file.type.startsWith('image/')) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imageBase64 = e.target.result.split(',')[1];
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('uploadPlaceholder').style.display = 'none';
+                document.getElementById('imagePreview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function removeImage() {
+            imageBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('previewImg').src = '';
+            document.getElementById('uploadPlaceholder').style.display = 'flex';
+            document.getElementById('imagePreview').style.display = 'none';
+        }
         
         function saveApiKey() {
             const key = document.getElementById('apiKey').value.trim();
